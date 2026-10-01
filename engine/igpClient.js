@@ -122,11 +122,37 @@ class IgpClient extends EventEmitter {
 		if (this.options.proxy) this.ig.state.proxyUrl = this.options.proxy;
 		await injectCookies(this.ig, list);
 
-		const me = await this.ig.account.currentUser(); // throws if session dead
+		let me;
+		try { me = await this.ig.account.currentUser(); } // throws if session dead
+		catch (err) {
+			const why = await this._diagnose(list).catch(() => null);
+			const e = new Error(((err && err.message) || String(err)) + (why ? ` | ${why}` : ""));
+			e.cause = err;
+			throw e;
+		}
 		this.userID = String(me.pk);
 		this.username = me.username;
 		this.emit("authenticated", { userID: this.userID });
 		return { success: true, userID: this.userID };
+	}
+
+	// Ask Instagram's WEB endpoint whether the cookie itself is still valid, so a
+	// rejected mobile-API call can be explained (expired cookie vs blocked server IP).
+	async _diagnose(list) {
+		const axios = require("axios");
+		const header = list.map(c => `${c.name}=${c.value}`).join("; ");
+		const csrf = (list.find(c => c.name === "csrftoken") || {}).value || "";
+		const res = await axios.get("https://www.instagram.com/api/v1/accounts/current_user/?edit=true", {
+			headers: {
+				cookie: header, "x-csrftoken": csrf, "x-ig-app-id": "936619743392459",
+				"x-requested-with": "XMLHttpRequest",
+				"user-agent": "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Mobile Safari/537.36"
+			},
+			validateStatus: () => true, timeout: 15000
+		});
+		const user = res.data && res.data.user && res.data.user.username;
+		if (user) return `DIAGNOSIS: the cookie is VALID for @${user}, but Instagram's mobile API refused this server (usually the host's IP is blocked). Set config.json account.proxy to a residential/mobile proxy.`;
+		return `DIAGNOSIS: Instagram web check failed (HTTP ${res.status}); the cookie looks expired or invalid. Export fresh cookies (do not log out afterwards).`;
 	}
 
 	async login(username, password) {

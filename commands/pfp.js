@@ -37,3 +37,29 @@ module.exports = {
       targetId = String(
         event.messageReply.user_id ||
         event.messageReply.senderID ||
+        ""
+      ).replace(/[^0-9]/g, "") || null;
+    }
+
+    if (!targetId) {
+      targetId = String(event.senderID || event.userID || "").replace(/[^0-9]/g, "") || null;
+    }
+
+    if (!targetId) return message.reply(getLang("failed", "User not found"));
+
+    try {
+      const info = await new Promise((resolve, reject) =>
+        api.getUserInfo(targetId, (error, result) => error ? reject(error) : resolve(result)));
+      const profile = info && (info[targetId] || Object.values(info)[0]);
+      const url = profile && (profile.profilePicture || profile.thumbSrc || profile.profilePicUrl);
+
+      if (!url) return message.reply(getLang("noPfp"));
+
+      const who = profile.vanity || profile.username || profile.name || targetId;
+      return message.reply({ body: `🖼️ @${who}`, attachment: url });
+    }
+    catch (error) {
+      return message.reply(getLang("failed", error && error.message ? error.message : String(error)));
+    }
+  }
+};

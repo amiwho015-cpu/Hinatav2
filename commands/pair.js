@@ -862,4 +862,72 @@ module.exports = {
 
       ]);
 
-      /* =================================
+      /* =========================================
+         CARD
+      ========================================= */
+
+      const W = 900;
+      const H = 520;
+      const canvas = createCanvas(W, H);
+      const ctx = canvas.getContext("2d");
+
+      const bg = ctx.createLinearGradient(0, 0, W, H);
+      bg.addColorStop(0, "#ff9a9e");
+      bg.addColorStop(1, "#fad0c4");
+      ctx.fillStyle = bg;
+      ctx.fillRect(0, 0, W, H);
+
+      const percent = Math.floor(Math.random() * 51) + 50;
+
+      ctx.fillStyle = "#ffffff";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.font = "bold 40px Arial";
+      ctx.fillText("LOVE PAIR", W / 2, 55);
+
+      for (const x of [250, 650]) {
+        ctx.beginPath();
+        ctx.arc(x, 235, 135, 0, Math.PI * 2);
+        ctx.fillStyle = "#ffffff";
+        ctx.fill();
+      }
+
+      drawCircleImage(ctx, senderAvatar, 250, 235, 250);
+      drawCircleImage(ctx, partnerAvatar, 650, 235, 250);
+
+      ctx.fillStyle = "#e63946";
+      ctx.font = "bold 110px Arial";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("\u2665", W / 2, 235);
+
+      roundedRect(ctx, 60, 395, 380, 70, 35, "rgba(255,255,255,0.92)");
+      roundedRect(ctx, 460, 395, 380, 70, 35, "rgba(255,255,255,0.92)");
+      drawName(ctx, sender.name || sender.username, 250, 430, 340);
+      drawName(ctx, partner.name || partner.username, 650, 430, 340);
+
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 30px Arial";
+      ctx.textAlign = "center";
+      ctx.fillText(`Love ${percent}%`, W / 2, 490);
+
+      const png = canvas.toBuffer("image/png");
+
+      return message.reply({
+        body:
+          `\uD83D\uDC9E ${sender.name || sender.username || senderID}` +
+          ` \u2764\uFE0F ${partner.name || partner.username || partnerID}\n` +
+          `Compatibility: ${percent}%`,
+        attachment: png
+      });
+
+    } catch (error) {
+
+      console.log("[PAIR] Failed:", error);
+
+      return message.reply(
+        "❌ Pair failed: " + (error && error.message ? error.message : String(error))
+      );
+    }
+  }
+};

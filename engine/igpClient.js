@@ -19,7 +19,7 @@
 const EventEmitter = require("events");
 const fs = require("fs");
 const crypto = require("crypto");
-const { extractCookies, injectCookies } = require("./cookies");
+const { extractCookies, injectCookies, jarOf } = require("./cookies");
 
 const unsupported = (what) => Promise.reject(new Error(`IGP engine: ${what} is not supported`));
 
@@ -120,7 +120,7 @@ class IgpClient extends EventEmitter {
 		const uid = (list.find(c => c.name === "ds_user_id") || {}).value;
 		this.ig = this._newIg(uid);
 		if (this.options.proxy) this.ig.state.proxyUrl = this.options.proxy;
-		injectCookies(this.ig, list);
+		await injectCookies(this.ig, list);
 
 		const me = await this.ig.account.currentUser(); // throws if session dead
 		this.userID = String(me.pk);
@@ -744,7 +744,7 @@ class IgpClient extends EventEmitter {
 
 	serialize() {
 		let cookies = [];
-		try { cookies = this.ig ? this.ig.state.cookieJar.serializeSync().cookies : []; } catch (_) {}
+		try { const j = this.ig && jarOf(this.ig); cookies = j && j.ser ? j.ser().cookies : []; } catch (_) {}
 		return { userID: this.userID, username: this.username, cookies };
 	}
 	getSession() { return this.serialize(); }

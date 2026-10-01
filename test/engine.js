@@ -18,7 +18,19 @@ const calls = [];
 let rt;
 let members = [{ pk: 222, username: "bob" }];
 
-class FakeJar { constructor() { this.c = []; } setCookieSync(s) { this.c.push(s); } serializeSync() { return { cookies: this.c.map(x => ({ key: x.split("=")[0], value: x.split("=")[1].split(";")[0] })) }; } }
+// Mirrors the REAL library: the top-level jar has NO setCookieSync (it is a
+// request-style jar wrapping a tough-cookie jar in `_jar`). This is what broke
+// cookie injection on a real deploy.
+class FakeJar {
+	constructor() {
+		this.c = [];
+		this._jar = {
+			setCookieSync: (s) => { if (!/^[\w-]+=/.test(s)) throw new Error("bad cookie"); this.c.push(s); },
+			serializeSync: () => ({ cookies: this.c.map(x => ({ key: x.split("=")[0], value: x.split("=")[1].split(";")[0] })) })
+		};
+	}
+	setCookie(s) { return this._jar.setCookieSync(s); }
+}
 class IgApiClient {
 	constructor() {
 		this.state = { cookieJar: new FakeJar(), generateDevice() { }, uuid: "u", cookieUserId: "111" };
@@ -56,6 +68,18 @@ const cb = (fn, ...args) => new Promise((res, rej) => fn(...args, (e, r) => e ? 
 
 	const api = await cb(login, { appState: [{ key: "sessionid", value: "abc", domain: "instagram.com", path: "/" }, { key: "ds_user_id", value: "111", domain: "instagram.com", path: "/" }] }, {});
 	assert.strictEqual(api.getCurrentUserID(), "111");
+	assert.strictEqual(api.getAppState().length, 2, "both cookies must really be injected into the jar");
+
+	// Fallback: a client whose jar cannot be set directly must use deserializeCookieJar.
+	{
+		const { injectCookies } = require(path.resolve(__dirname, "..", "engine", "cookies"));
+		let payload = null;
+		const odd = { state: { cookieJar: {}, deserializeCookieJar: async (t) => { payload = JSON.parse(t); } } };
+		const n = await injectCookies(odd, [{ name: "sessionid", value: "x", domain: ".instagram.com", path: "/", secure: true, httpOnly: true, expires: 1798765432 }]);
+		assert.strictEqual(n, 1);
+		assert.strictEqual(payload.cookies[0].key, "sessionid");
+		await assert.rejects(() => injectCookies({ state: { cookieJar: {} } }, [{ name: "a", value: "b" }]), /Could not load cookies/);
+	}
 
 	const events = [];
 	api.listenMqtt((e, ev) => { if (!e) events.push(normalizeEvent(ev)); });

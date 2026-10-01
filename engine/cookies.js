@@ -72,23 +72,63 @@ function extractCookies(text) {
 	return parseRaw(t);
 }
 
-function injectCookies(ig, cookies) {
+// Find a usable cookie jar. instagram-private-api exposes either a tough-cookie
+// CookieJar (setCookieSync) or a request-style jar that wraps one in `_jar`.
+function jarOf(ig) {
+	const j = ig && ig.state && ig.state.cookieJar;
+	if (!j) return null;
+	if (typeof j.setCookieSync === "function") return { set: (s, u) => j.setCookieSync(s, u), ser: () => j.serializeSync() };
+	if (j._jar && typeof j._jar.setCookieSync === "function") return { set: (s, u) => j._jar.setCookieSync(s, u), ser: () => j._jar.serializeSync() };
+	if (typeof j.setCookie === "function") return { set: (s, u) => j.setCookie(s, u), ser: null };
+	return null;
+}
+
+// Returns how many cookies were injected. Throws if none could be.
+async function injectCookies(ig, cookies) {
+	const jar = jarOf(ig);
 	let count = 0;
-	for (const c of cookies) {
-		let s = `${c.name}=${c.value}; Domain=${c.domain}; Path=${c.path}`;
-		const exp = Number(c.expires);
-		if (Number.isFinite(exp) && exp > 0) s += `; Expires=${new Date(exp * 1000).toUTCString()}`;
-		if (c.secure) s += "; Secure";
-		if (c.httpOnly) s += "; HttpOnly";
-		try {
-			ig.state.cookieJar.setCookieSync(s, "https://www.instagram.com/");
-			count++;
-		}
-		catch (e) {
-			console.error(`[FeedBridge] ⚠️ কুকি স্কিপ (${c.name}): ${e.message}`);
+	let lastErr = null;
+
+	if (jar) {
+		for (const c of cookies) {
+			let s = `${c.name}=${c.value}; Domain=${c.domain}; Path=${c.path}`;
+			const exp = Number(c.expires);
+			if (Number.isFinite(exp) && exp > 0) s += `; Expires=${new Date(exp * 1000).toUTCString()}`;
+			if (c.secure) s += "; Secure";
+			if (c.httpOnly) s += "; HttpOnly";
+			try { jar.set(s, "https://www.instagram.com/"); count++; }
+			catch (e) { lastErr = e; }
 		}
 	}
+
+	// Fallback: the library's documented way to load a serialized cookie jar.
+	if (count === 0 && ig && ig.state && typeof ig.state.deserializeCookieJar === "function") {
+		const now = new Date().toISOString();
+		const payload = {
+			version: "tough-cookie@4.1.3",
+			storeType: "MemoryCookieStore",
+			rejectPublicSuffixes: true,
+			enableLooseMode: false,
+			allowSpecialUseDomain: true,
+			prefixSecurity: "silent",
+			cookies: cookies.map(c => {
+				const exp = Number(c.expires);
+				const out = {
+					key: c.name, value: c.value,
+					domain: String(c.domain || ".instagram.com").replace(/^\./, ""),
+					path: c.path || "/", secure: c.secure !== false, httpOnly: Boolean(c.httpOnly),
+					hostOnly: false, creation: now, lastAccessed: now
+				};
+				if (Number.isFinite(exp) && exp > 0) out.expires = new Date(exp * 1000).toISOString();
+				return out;
+			})
+		};
+		await ig.state.deserializeCookieJar(JSON.stringify(payload));
+		count = cookies.length;
+	}
+
+	if (count === 0) throw new Error("Could not load cookies into the Instagram client" + (lastErr ? `: ${lastErr.message}` : ""));
 	return count;
 }
 
-module.exports = { extractCookies, injectCookies };
+module.exports = { extractCookies, injectCookies, jarOf };

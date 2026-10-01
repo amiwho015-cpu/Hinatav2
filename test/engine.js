@@ -34,6 +34,7 @@ class FakeJar {
 class IgApiClient {
 	constructor() {
 		this.state = { cookieJar: new FakeJar(), generateDevice() { }, uuid: "u", cookieUserId: "111" };
+		globalThis.__lastIg = this;
 		this.account = { currentUser: async () => ({ pk: 111, username: "botuser" }), setBiography: async (t) => calls.push(["bio", t]) };
 		this.feed = {
 			directInbox: () => ({
@@ -69,6 +70,11 @@ const cb = (fn, ...args) => new Promise((res, rej) => fn(...args, (e, r) => e ? 
 	const api = await cb(login, { appState: [{ key: "sessionid", value: "abc", domain: "instagram.com", path: "/" }, { key: "ds_user_id", value: "111", domain: "instagram.com", path: "/" }] }, {});
 	assert.strictEqual(api.getCurrentUserID(), "111");
 	assert.strictEqual(api.getAppState().length, 2, "both cookies must really be injected into the jar");
+	const auth = globalThis.__lastIg.state.authorization;
+	assert.ok(auth && auth.startsWith("Bearer IGT:2:"), "cookie sessions need an IGT authorization header");
+	const decoded = JSON.parse(Buffer.from(auth.slice("Bearer IGT:2:".length), "base64").toString());
+	assert.strictEqual(decoded.sessionid, "abc");
+	assert.strictEqual(decoded.ds_user_id, "111");
 
 	// Fallback: a client whose jar cannot be set directly must use deserializeCookieJar.
 	{
@@ -140,6 +146,19 @@ const cb = (fn, ...args) => new Promise((res, rej) => fn(...args, (e, r) => e ? 
 	await assert.rejects(() => api.musicSearch("x"), /not supported/);
 
 	api.stopListening();
+
+	// Proxy: applied to the client, MQTT skipped (polling only).
+	{
+		const cookies = [{ key: "sessionid", value: "abc", domain: "instagram.com", path: "/" }, { key: "ds_user_id", value: "111", domain: "instagram.com", path: "/" }];
+		const papi = await login({ appState: cookies }, { proxy: "http://u:p@10.0.0.1:8080" });
+		assert.strictEqual(globalThis.__lastIg.state.proxyUrl, "http://u:p@10.0.0.1:8080");
+		papi.listenMqtt(() => { });
+		await wait(200);
+		assert.strictEqual(papi.getHealth().realtime, false, "no MQTT while a proxy is set");
+		papi.stopListening();
+		await assert.rejects(() => login({ appState: cookies }, { proxy: "not a url" }), /Invalid proxy URL/);
+	}
+
 	console.log("engine: all checks passed");
 	process.exit(0);
 })().catch(e => { console.error("ENGINE TEST FAILED:", e); process.exit(1); });

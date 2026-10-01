@@ -71,6 +71,14 @@ function loadConfig() {
 	config.antiInbox = config.antiInbox === true;
 	config.noPrefix = config.noPrefix === true;
 
+	// Instagram proxy. IG_PROXY (an environment secret, keeps credentials out of
+	// the repo) wins over config.json "account.proxy". Format:
+	//   http://user:pass@host:port   (HTTP/HTTPS proxy)
+	config.account = config.account || {};
+	const envProxy = String(process.env.IG_PROXY || "").trim();
+	if (envProxy) config.account.proxy = envProxy;
+	if (config.account.proxy != null && String(config.account.proxy).trim() === "") config.account.proxy = null;
+
 	// Optional secrets/endpoints for custom commands.
 	//
 	// Only the namespaced INSTABOT_* variables are read: hosts like Render set a

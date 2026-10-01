@@ -155,6 +155,18 @@ function login(credentials, options, callback) {
 	options = options || {};
 
 	const promise = (async () => {
+		if (options.proxy) {
+			let shown;
+			try {
+				const u = new URL(String(options.proxy));
+				if (!/^https?:$/.test(u.protocol)) throw new Error("unsupported scheme");
+				shown = `${u.protocol}//${u.hostname}${u.port ? ":" + u.port : ""}`;
+			}
+			catch (e) {
+				throw new Error(`Invalid proxy URL. Use http://user:pass@host:port (${e.message})`);
+			}
+			console.log(`[ENGINE] Instagram requests go through proxy ${shown}`);
+		}
 		const client = new IgpClient({
 			selfListen: options.selfListen === true,
 			proxy: options.proxy || null,

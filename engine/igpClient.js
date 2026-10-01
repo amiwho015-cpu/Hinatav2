@@ -122,6 +122,20 @@ class IgpClient extends EventEmitter {
 		if (this.options.proxy) this.ig.state.proxyUrl = this.options.proxy;
 		await injectCookies(this.ig, list);
 
+		// The Instagram mobile API authenticates with an `Authorization: Bearer IGT:2:...`
+		// header. A normal login gets it from Instagram; a cookie-only session has to
+		// build it from sessionid + ds_user_id, otherwise Instagram answers
+		// "We're sorry, but something went wrong". IGP_AUTH_HEADER=0 turns this off.
+		try {
+			const sid = (list.find(c => c.name === "sessionid") || {}).value;
+			if (String(process.env.IGP_AUTH_HEADER || "1") !== "0" && sid && uid && !this.ig.state.authorization) {
+				const payload = { ds_user_id: String(uid), sessionid: sid, should_use_header_over_cookies: true };
+				this.ig.state.authorization = "Bearer IGT:2:" + Buffer.from(JSON.stringify(payload)).toString("base64");
+			}
+		}
+		catch (_) { /* optional */ }
+
+
 		let me;
 		try { me = await this.ig.account.currentUser(); } // throws if session dead
 		catch (err) {
@@ -139,6 +153,7 @@ class IgpClient extends EventEmitter {
 	// Ask Instagram's WEB endpoint whether the cookie itself is still valid, so a
 	// rejected mobile-API call can be explained (expired cookie vs blocked server IP).
 	async _diagnose(list) {
+		if (this.options.proxy) return "A proxy is in use: check the proxy credentials/host, and that the cookie was exported from a logged-in browser.";
 		const axios = require("axios");
 		const header = list.map(c => `${c.name}=${c.value}`).join("; ");
 		const csrf = (list.find(c => c.name === "csrftoken") || {}).value || "";
@@ -152,7 +167,9 @@ class IgpClient extends EventEmitter {
 		});
 		const user = res.data && res.data.user && res.data.user.username;
 		if (user) return `DIAGNOSIS: the cookie is VALID for @${user}, but Instagram's mobile API refused this server (usually the host's IP is blocked). Set config.json account.proxy to a residential/mobile proxy.`;
-		return `DIAGNOSIS: Instagram web check failed (HTTP ${res.status}); the cookie looks expired or invalid. Export fresh cookies (do not log out afterwards).`;
+		let snippet = "";
+		try { snippet = (typeof res.data === "string" ? res.data : JSON.stringify(res.data || {})).replace(/\s+/g, " ").slice(0, 140); } catch (_) {}
+		return `Web check: HTTP ${res.status} ${snippet} (cannot tell whether the cookie is bad or this server's IP is blocked)`;
 	}
 
 	async login(username, password) {
@@ -236,8 +253,12 @@ class IgpClient extends EventEmitter {
 		};
 		loop();
 
-		if (this.ig.realtime) this._connectRealtime();
-		this.emit("connected", { method: this.ig.realtime ? "realtime+polling" : "polling" });
+		// instagram_mqtt cannot use an HTTP proxy: with a proxy set, stay on polling
+		// (REST, proxied) so the realtime socket never leaks the host's own IP.
+		const useRealtime = Boolean(this.ig.realtime) && (!this.options.proxy || process.env.ICA_REALTIME_WITH_PROXY === "1");
+		if (useRealtime) this._connectRealtime();
+		else if (this.options.proxy) console.log("[IGP] proxy set: using proxied polling instead of MQTT realtime");
+		this.emit("connected", { method: useRealtime ? "realtime+polling" : "polling" });
 		return () => this.stopListening();
 	}
 

@@ -672,3 +672,7 @@ The bot now logs in with its own engine in `engine/` (instagram-private-api + in
 - Not available: text/avatar effects (sent as plain text), music search/send, voice messages, avatar change.
 - Unverified against live Instagram: reactions received, remove-user, reply threading. Test them once.
 - Tests: `npm test` (engine test runs against a fake Instagram API).
+
+### Proxy (if Instagram blocks your host's IP)
+
+Set the environment secret `IG_PROXY=http://user:pass@host:port` (or `account.proxy` in config.json). All Instagram requests then go through it. With a proxy the bot uses polling instead of MQTT realtime (~4s delay). Use a residential/mobile proxy; datacenter proxies are usually blocked too.

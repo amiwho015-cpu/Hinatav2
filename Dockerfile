@@ -1,8 +1,8 @@
 # InstaBOT — production image for Render / Railway / any container host.
 #
-# The bot has no npm dependencies of its own: it talks to the private
-# ig-chat-api-server over HTTP + SSE, so both config.server.url and
-# config.server.token (or IG_API_SERVER / IG_API_TOKEN) must be provided.
+# The bot runs its own local Instagram engine (instagram-private-api +
+# instagram_mqtt). Provide cookies via account.txt (or a Render Secret File and
+# IG_ACCOUNT_PATH=/etc/secrets/account.txt). No external server is needed.
 FROM node:20-alpine
 
 ENV NODE_ENV=production

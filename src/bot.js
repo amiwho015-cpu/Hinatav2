@@ -31,23 +31,20 @@ function loadServerCookies() {
 }
 
 /**
- * Resolve the login function. When `server.url` + `server.token` are set the
- * bot talks to the private ig-chat-api server through auth.js; otherwise it
- * falls back to a locally-installed ig-chat-api package (Mode B, development).
+ * Resolve the login function.
+ *
+ * Default: the LOCAL engine (engine/, built on instagram-private-api +
+ * instagram_mqtt). It reads cookies from account.txt and needs no server.
+ * Set IG_ENGINE=server to use the old remote ig-chat-api server instead
+ * (needs server.url + server.token, or IG_API_SERVER / IG_API_TOKEN).
  */
 function resolveLogin(config) {
 	const server = config.server || {};
-	if (server.url && server.token) return { login: serverLogin, mode: "server" };
-	try {
-		return { login: require("ig-chat-api"), mode: "direct" };
+	if (String(process.env.IG_ENGINE || "").toLowerCase() === "server") {
+		if (server.url && server.token) return { login: serverLogin, mode: "server" };
+		throw new Error("IG_ENGINE=server needs server.url + server.token (or IG_API_SERVER / IG_API_TOKEN).");
 	}
-	catch (error) {
-		throw new Error(
-			"No server configured and the direct 'ig-chat-api' package is not installed.\n" +
-			"Recommended: set server.url + server.token in config.json (or IG_API_SERVER / IG_API_TOKEN).\n" +
-			"Mode B (development): install ig-chat-api into node_modules and place cookies in account.txt."
-		);
-	}
+	return { login: require("../engine"), mode: "direct" };
 }
 
 /**

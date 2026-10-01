@@ -2199,10 +2199,12 @@ async function main() {
 			onlineStatus: { enable: false },
 			welcome: { enable: false }, leave: { enable: false }
 		};
+		process.env.IG_ENGINE = "server"; // this test exercises the legacy remote-server mode
 		const bot = createBot(config);
 		let settled = false;
 		const startPromise = bot.start().then(() => { settled = true; }, () => { settled = true; });
 		await new Promise(r => setTimeout(r, 1500));
+		delete process.env.IG_ENGINE;
 		assert.strictEqual(settled, false, "start() must stay pending while retrying");
 		assert.ok(requests >= 1, "the bot should have attempted at least one connect");
 		await bot.stop();

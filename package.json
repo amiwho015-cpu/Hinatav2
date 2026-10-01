@@ -1,7 +1,7 @@
 {
   "name": "instabot",
   "version": "1.0.0",
-  "description": "A modular Instagram Direct chat bot powered by ig-chat-api.",
+  "description": "A modular Instagram Direct chat bot (local engine: instagram-private-api + instagram_mqtt).",
   "main": "index.js",
   "type": "commonjs",
   "engines": {
@@ -9,13 +9,15 @@
   },
   "scripts": {
     "start": "node index.js",
-    "test": "node test/run.js",
+    "test": "node test/run.js && node test/engine.js",
     "test:live": "node test/live-send.js"
   },
   "dependencies": {
     "@napi-rs/canvas": "^0.1.44",
     "axios": "^1.6.0",
-    "fs-extra": "^11.1.0"
+    "fs-extra": "^11.1.0",
+    "instagram-private-api": "^1.46.1",
+    "instagram_mqtt": "^1.2.2"
   },
   "author": "Saifullah Al Neoaz",
   "contributors": [

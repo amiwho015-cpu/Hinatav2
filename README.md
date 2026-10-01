@@ -658,3 +658,17 @@ MIT © [Saifullah Al Neoaz](https://github.com/lazyneoaz) — see [LICENSE](LICE
 [![MIT License](https://img.shields.io/badge/license-MIT-c13584?style=for-the-badge)](LICENSE)
 
 </div>
+
+---
+
+## Local engine (default, no server needed)
+
+The bot now logs in with its own engine in `engine/` (instagram-private-api + instagram_mqtt) instead of the remote ig-chat-api server.
+
+- Cookies: `account.txt` (Netscape / JSON / `sessionid=...; ds_user_id=...`). On Render use a Secret File and set `IG_ACCOUNT_PATH=/etc/secrets/account.txt`.
+- Realtime = MQTT push; the inbox is also polled as a safety net (30s while MQTT is up, `ICA_POLL_MS`=4s while down). `ICA_REALTIME=0` = polling only.
+- `IG_ENGINE=server` switches back to the old remote server (`server.url` + `server.token`).
+- Works: text, reply, photo, video, reaction, unsend, typing, user/thread info, join/leave events, bio, profile picture, add user.
+- Not available: text/avatar effects (sent as plain text), music search/send, voice messages, avatar change.
+- Unverified against live Instagram: reactions received, remove-user, reply threading. Test them once.
+- Tests: `npm test` (engine test runs against a fake Instagram API).

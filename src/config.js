@@ -183,12 +183,20 @@ function normalizeCookies(list) {
  * Accepts: JSON array, JSON object, cookie header string, Netscape file.
  */
 function loadAccount() {
-	if (!fs.existsSync(accountPathFor()))
-		throw new Error(
-			"account.txt not found. Copy account.example.txt to account.txt and paste your Instagram cookies. " +
-			"It is git-ignored, so your cookies are never committed."
-		);
-	const text = fs.readFileSync(accountPathFor(), "utf8").trim();
+	// An environment secret wins over the file: IG_COOKIES (or ACCOUNT_TXT) holds
+	// the same content as account.txt. Handy on hosts where a secret file is not
+	// readable by the container user.
+	const envText = String(process.env.IG_COOKIES || process.env.ACCOUNT_TXT || "").trim();
+	let text = envText;
+	if (!text) {
+		if (!fs.existsSync(accountPathFor()))
+			throw new Error(
+				"account.txt not found. Copy account.example.txt to account.txt and paste your Instagram cookies. " +
+				"It is git-ignored, so your cookies are never committed. " +
+				"(Or set the IG_COOKIES environment secret.)"
+			);
+		text = fs.readFileSync(accountPathFor(), "utf8").trim();
+	}
 	if (!text) throw new Error("account.txt is empty");
 
 	let cookies = [];

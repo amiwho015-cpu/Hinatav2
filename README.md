@@ -665,7 +665,7 @@ MIT © [Saifullah Al Neoaz](https://github.com/lazyneoaz) — see [LICENSE](LICE
 
 The bot now logs in with its own engine in `engine/` (instagram-private-api + instagram_mqtt) instead of the remote ig-chat-api server.
 
-- Cookies: `account.txt` (Netscape / JSON / `sessionid=...; ds_user_id=...`). On Render use a Secret File and set `IG_ACCOUNT_PATH=/etc/secrets/account.txt`.
+- Cookies: `account.txt` (Netscape / JSON / `sessionid=...; ds_user_id=...`). On Render use a Secret File and set `IG_ACCOUNT_PATH=/etc/secrets/account.txt`. Or set the `IG_COOKIES` environment secret (same content as account.txt).
 - Realtime = MQTT push; the inbox is also polled as a safety net (30s while MQTT is up, `ICA_POLL_MS`=4s while down). `ICA_REALTIME=0` = polling only.
 - `IG_ENGINE=server` switches back to the old remote server (`server.url` + `server.token`).
 - Works: text, reply, photo, video, reaction, unsend, typing, user/thread info, join/leave events, bio, profile picture, add user.
